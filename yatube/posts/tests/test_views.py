@@ -73,8 +73,7 @@ class PostPagesTests(TestCase):
     def test_group_list_show_correct_context(self):
         """Список постов в шаблоне group_list равен ожидаемому контексту."""
         response = self.authorized_client.get(
-            reverse("posts:group_list",kwargs={'slug':self.group.slug})
-            )
+            reverse("posts:group_list", kwargs={'slug': self.group.slug}))
         first_object = response.context["group"]
         group_title_0 = first_object.title
         group_slug_0 = first_object.slug
