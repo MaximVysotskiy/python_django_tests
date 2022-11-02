@@ -2,7 +2,7 @@ from django import forms
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Post, Group, User
+from ..models import Group, Post, User
 
 
 class PostPagesTests(TestCase):
@@ -17,7 +17,7 @@ class PostPagesTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user,
-            text= 'text',
+            text='text',
             group=cls.group,
         )
         cls.templates_pages_names = {
@@ -36,7 +36,6 @@ class PostPagesTests(TestCase):
             ): "posts/create_post.html",
             reverse("posts:post_create"): "posts/create_post.html",
         }
-
 
     def setUp(self):
         self.authorized_client = Client()
@@ -75,7 +74,8 @@ class PostPagesTests(TestCase):
         """Список постов в шаблоне group_list равен ожидаемому контексту."""
         response = self.authorized_client.get(reverse
                                               ("posts:group_list",
-                                               kwargs={'slug': self.group.slug}))
+                                               kwargs={'slug':
+                                               self.group.slug}))
         first_object = response.context["group"]
         group_title_0 = first_object.title
         group_slug_0 = first_object.slug
@@ -155,6 +155,7 @@ class PostPagesTests(TestCase):
                 form_field = response.context["page_obj"]
                 self.assertNotIn(expected, form_field)
 
+
 class PaginatorViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -181,21 +182,27 @@ class PaginatorViewsTest(TestCase):
     def test_first_page_contains_ten_posts(self):
         list_urls = {
             reverse("posts:index"): "posts/index.html",
-            reverse("posts:group_list", kwargs={"slug": "test_slug"}): "posts/group_list.html",
-            reverse("posts:profile", kwargs={"username": "test_name"}): "posts/profile.html",
+            reverse("posts:group_list",
+                    kwargs={"slug": "test_slug"}): "posts/group_list.html",
+            reverse("posts:profile",
+                    kwargs={"username": "test_name"}): "posts/profile.html",
         }
         for tested_url in list_urls.keys():
             response = self.client.get(tested_url)
-            self.assertEqual(len(response.context.get('page_obj').object_list), 10)
+            self.assertEqual(
+                len(response.context.get('page_obj').object_list), 10)
 
     def test_second_page_contains_three_posts(self):
         list_urls = {
             reverse("posts:index") + "?page=2": "posts/index.html",
-            reverse("posts:group_list", kwargs={"slug": "test_slug"}) + "?page=2":
+            reverse("posts:group_list",
+                    kwargs={"slug": "test_slug"}) + "?page=2":
             "posts/group_list.html",
-            reverse("posts:profile", kwargs={"username": "test_name"}) + "?page=2":
+            reverse("posts:profile",
+                    kwargs={"username": "test_name"}) + "?page=2":
             "posts/profile.html",
         }
         for tested_url in list_urls.keys():
             response = self.client.get(tested_url)
-            self.assertEqual(len(response.context.get('page_obj').object_list), 3)
+            self.assertEqual(
+                len(response.context.get('page_obj').object_list), 3)

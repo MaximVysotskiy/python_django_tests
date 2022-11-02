@@ -1,22 +1,21 @@
 from http import HTTPStatus
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
-from ..models import Post, Group
 
+from ..models import Group, Post
 
 User = get_user_model()
 
 
 class PostFormTests(TestCase):
 
-
     def setUp(self):
         self.user = User.objects.create(username="agent007")
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
-
 
     def test_create_post(self):
         """Валидная форма создает запись в Post."""
@@ -32,7 +31,6 @@ class PostFormTests(TestCase):
         self.assertEqual(Post.objects.count(), posts_count + 1)
         self.assertTrue(Post.objects.filter(text="Тестовый текст").exists())
         self.assertEqual(response.status_code, HTTPStatus.OK)
-
 
     def test_post_edit(self):
         """Валидная форма изменяет запись в Post."""

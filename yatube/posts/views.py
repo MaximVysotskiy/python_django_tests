@@ -1,5 +1,5 @@
-from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import PostForm
 from .models import Group, Post, User
@@ -84,4 +84,3 @@ def post_edit(request, post_id):
         request, 'posts/post_create.html',
         {'form': form, 'is_edit': True, 'p_id': post_id}
     )
-
