@@ -2,7 +2,7 @@ from django import forms
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Group, Post, User
+from posts.models import Group, Post, User
 
 
 class PostPagesTests(TestCase):
