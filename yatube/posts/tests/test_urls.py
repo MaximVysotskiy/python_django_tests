@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 from django.test import Client, TestCase
-
 from posts.models import Group, Post, User
 
 
@@ -40,39 +39,27 @@ class PostURLTests(TestCase):
     def test_quest_str(self):
         """страницы главная,группы,профайл и пост доступны всем"""
         for adress in self.url_names:
-            with self.subTest():
-                response = self.authorized_client.get(adress)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_create_for_authorized(self):
-        """Страница create доступна авторизованному пользователю."""
-        response = self.authorized_client.get('/create/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_private_url(self):
-        """без авторизации приватные URL недоступны"""
-        for adress in self.url_names:
             with self.subTest(adress):
                 response = self.authorized_client.get(adress)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    def test_redirect_anonymous_on_login(self):
-        """Страница /create/ перенаправит анонимного пользователя
-        на страницу логина.
-        """
-        response = self.client.get('/create/', follow=True)
-        self.assertRedirects(
-            response, ('/auth/login/?next=/create/'))
-
-    def test_edit_post_list_url_exists_at_desired_location(self):
-        """Страница /posts/1/edit/ доступна автору."""
-        response = self.authorized_client.get('/posts/1/edit/')
+    def test_posts_post_id_edit_url_exists_at_author(self):
+        """Страница /posts/post_id/edit/ доступна только автору."""
+        self.user = User.objects.get(username=self.user)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(PostURLTests.user)
+        response = self.authorized_client.get(f"/posts/{self.post.id}/edit/")
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_create_url_redirect_anonymous_on_auth_login(self):
+        """Страница /create/ доступна авторизованному пользователю."""
+        response = self.client.get("/create/", follow=True)
+        self.assertRedirects(response, "/auth/login/?next=/create/")
 
     def test_urls_uses_correct_template(self):
         """URL-адрес использует соответствующий шаблон."""
         for url, template in self.templates_url_names.items():
-            with self.subTest(url=url):
+            with self.subTest(template=template):
                 response = self.authorized_client.get(url)
                 self.assertTemplateUsed(response, template)
 

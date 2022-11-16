@@ -1,13 +1,10 @@
 {% extends 'base.html' %}
 {% load thumbnail %}
 {% block title %}
-  Последние обновления на сайте
+  Мои подписки
 {% endblock %}
 {% block content %}
-  {% load cache %}
-  {% cache 20 index_page %}
 <main>
-  <h1>Главная</h1>
   {% include 'posts/includes/switcher.html' %}
   {% for post in page_obj %}
     <ul>
@@ -38,5 +35,4 @@
   {% endfor %}
   </main>
   {% include 'posts/includes/paginator.html' %}
- {% endcache %}
 {% endblock %}

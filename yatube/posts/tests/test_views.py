@@ -1,8 +1,13 @@
-from django import forms
-from django.test import Client, TestCase
-from django.urls import reverse
+import shutil
+import tempfile
 
-from posts.models import Group, Post, User
+from django import forms
+from django.conf import settings
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+from posts.models import Comments, Follow, Group, Post, User
 
 
 class PostPagesTests(TestCase):
@@ -117,6 +122,7 @@ class PostPagesTests(TestCase):
         form_fields = {
             "text": forms.fields.CharField,
             "group": forms.models.ModelChoiceField,
+            "image": forms.fields.ImageField,
         }
         for value, expected in form_fields.items():
             with self.subTest(value=value):
@@ -152,6 +158,56 @@ class PostPagesTests(TestCase):
                 response = self.authorized_client.get(value)
                 form_field = response.context["page_obj"]
                 self.assertNotIn(expected, form_field)
+
+    def test_comment_correct_context(self):
+        """Форма Комментария создает запись в Post"""
+        comments_count = Comments.objects.count()
+        form_data = {"text": "Тестовый комментарий"}
+        response = self.authorized_client.post(
+            reverse("posts:add_comment", kwargs={"post_id": self.post.id}), data=form_data, follow=True
+        )
+        self.assertRedirects(
+            response,
+            reverse('posts:post_detail', kwargs={"post_id": self.post.id})
+        )
+        self.assertEqual(Comments.objects.count(), comments_count + 1)
+        self.assertTrue(Comments.objects.filter(text="Тестовый комментарий").exists())
+
+    def test_cache_index(self):
+        """Проверка хранения и очищения кэша для index."""
+        response = self.authorized_client.get(reverse('posts:index'))
+        posts = response.content
+        Post.objects.create(
+            text='test_new_post',
+            author=self.post.author,
+        )
+        response_old = self.authorized_client.get(reverse('posts:index'))
+        old_posts = response_old.content
+        self.assertEqual(old_posts, posts)
+        cache.clear()
+        response_new = self.authorized_client.get(reverse('posts:index'))
+        new_posts = response_new.content
+        self.assertNotEqual(old_posts, new_posts)
+
+    def test_follow_page(self):
+        '''Авторизованный пользователь может подписываться на других пользователей и удалять их.'''
+        response = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertEqual(len(response.context["page_obj"]), 0)
+        Follow.objects.get_or_create(user=self.user, author=self.post.author)
+        post_1 = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertEqual(len(post_1.context["page_obj"]), 1)
+        self.assertIn(self.post, post_1.context["page_obj"])
+
+        # Проверка что пост не появился в избранных у юзера-обычного
+        outsider = User.objects.create(username="NoName")
+        self.authorized_client.force_login(outsider)
+        post_1 = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertNotIn(self.post, post_1.context["page_obj"])
+
+        # Проверка отписки от автора поста
+        Follow.objects.all().delete()
+        post_2 = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertEqual(len(post_2.context["page_obj"]), 0)
 
 
 class PaginatorViewsTest(TestCase):
@@ -204,3 +260,81 @@ class PaginatorViewsTest(TestCase):
             response = self.client.get(tested_url)
             self.assertEqual(
                 len(response.context.get('page_obj').object_list), 3)
+
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class TaskPagesTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super(TaskPagesTests, cls).setUpClass()
+        cls.user = User.objects.create_user(username="agent007")
+        cls.group = Group.objects.create(
+            title="Test group",
+            slug="test_group_slug",
+            description="Test group description",
+        )
+        cls.small_gif = (
+             b'\x47\x49\x46\x38\x39\x61\x02\x00'
+             b'\x01\x00\x80\x00\x00\x00\x00\x00'
+             b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+             b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+             b'\x0A\x00\x3B'
+        )
+        cls.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=cls.small_gif,
+            content_type='image/gif'
+        )
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text="Тестовый текст",
+            group=cls.group,
+            image=cls.uploaded
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
+    def setUp(self):
+        self.guest_client = Client()
+
+    def test_image_in_group_list_page(self):
+        """Картинка передается на страницу group_list."""
+        response = self.guest_client.get(
+            reverse("posts:group_list", kwargs={"slug": self.group.slug}),
+        )
+        obj = response.context["page_obj"][0]
+        self.assertEqual(obj.image, self.post.image)
+
+    def test_image_in_index_and_profile_page(self):
+        """Картинка передается на страницу index_and_profile."""
+        templates = (
+            reverse("posts:index"),
+            reverse("posts:profile", kwargs={"username": self.post.author}),
+        )
+        for url in templates:
+            with self.subTest(url):
+                response = self.guest_client.get(url)
+                obj = response.context["page_obj"][0]
+                self.assertEqual(obj.image, self.post.image)
+
+    def test_image_in_post_detail_page(self):
+        """Картинка передается на страницу post_detail."""
+        response = self.guest_client.get(
+            reverse("posts:post_detail", kwargs={"post_id": self.post.id})
+        )
+        obj = response.context["post"]
+        self.assertEqual(obj.image, self.post.image)
+
+    def test_image_in_page(self):
+        """Проверяем что при создании поста с картинкой создается запись в БД"""
+        self.assertTrue(
+            Post.objects.filter(
+            text='Тестовый текст', image='posts/small.gif').exists()
+        )
